@@ -1,2 +1,2 @@
 # PlexTools
-A Repo to store Python script that access the Plex API
+A Repo to store Python scripts that access the Plex API
