@@ -8,6 +8,9 @@ from plexapi.server import PlexServer
 # Top Level Folder is the Library (of type TV Show within Plex) -- (Drum Corps)
 # Subfolder to process is the Show Name.  (DCI Finals)
 # Subfolders within the Show Name folder are the seasons.  (1974, 1975, etc.)
+# 
+# Sample media file name (the pattern matcher evaluates this):
+# S1984E015 - Colts.mp4
 
 def get_directory_names(path):
     """
@@ -37,14 +40,14 @@ seasons = get_directory_names(LIBRARY_HOME)
 
 for SEASON_STRING in seasons:
     # In this case, I happen to know that each directory name is an integer (a Year number)
-    # so i am forcing the directory name to be interpreted as an integer here since Plex
+    # so I am forcing the directory name to be interpreted as an integer here since Plex
     # is expecting an integer for a season number.
-    SEASON_NUMBER= int(SEASON_STRING)
+    SEASON_NUMBER = int(SEASON_STRING)
     season = tv_show.season(SEASON_NUMBER)
     episodes = season.episodes()
 
     # --- Define a Regex Pattern ---
-    # This example assumes filenames like: "Show Name - S01E01 - Episode Title.mkv"
+    # This example assumes filenames like: "S01E01 - Episode Title.mkv"
     # Adjust the regex if your naming differs.
     pattern = re.compile(r"S\d+E\d+ - (.+)\.[^.]+$")
 
@@ -75,7 +78,6 @@ for SEASON_STRING in seasons:
                     # Note: Your Plex server must allow metadata editing for this to work.
                     # I am not sure WHY this magical syntax does the job, but it does.
                     episode.edit(**{"title.value":new_title})
-                    episode.refresh
                     print("Update of title was successful.")
                 except Exception as e:
                     print(f"Error updating episode '{episode.title}': {e}")
