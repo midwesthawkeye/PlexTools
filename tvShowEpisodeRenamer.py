@@ -3,10 +3,16 @@ import os
 import re
 from plexapi.server import PlexServer
 
+# This program will attempt to rename episodes of a show using the metadata stored in the filename.
+# Files should be stroed in the following manner:
+# Top Level Folder is the Library (of type TV Show within Plex) -- (Drum Corps)
+# Subfolder to process is the Show Name.  (DCI Finals)
+# Subfolders within the Show Name folder are the seasons.  (1974, 1975, etc.)
 
 def get_directory_names(path):
     """
-    Returns a list of directory names in the given path.
+    Returns a list of directory names that reside at the given path.
+    Used to come up with a list of the Seasons folders here.
     """
     directory_names = []
     for item in os.listdir(path):
@@ -20,16 +26,19 @@ PLEX_URL = 'http://localhost:32400'           # Update if your Plex server is on
 PLEX_TOKEN = 'aypiCtP6JnKHp3397Px4'             # Replace with your Plex token
 LIBRARY_NAME = 'Drum Corps'                    # Name of your Plex library
 SHOW_NAME = 'DCI Finals'
-#SEASON_NUMBER = 1970
+LIBRARY_HOME = '/media/devmon/Samsung/Drum Corps/DCI Finals'
 
 # --- Connect to Plex ---
 plex = PlexServer(PLEX_URL, PLEX_TOKEN)
 library = plex.library.section(LIBRARY_NAME)
 tv_show = plex.library.section(LIBRARY_NAME).get(SHOW_NAME)
 
-seasons = get_directory_names('/media/devmon/Samsung/Drum Corps/DCI Finals')
+seasons = get_directory_names(LIBRARY_HOME)
 
 for SEASON_STRING in seasons:
+    # In this case, I happen to know that each directory name is an integer (a Year number)
+    # so i am forcing the directory name to be interpreted as an integer here since Plex
+    # is expecting an integer for a season number.
     SEASON_NUMBER= int(SEASON_STRING)
     season = tv_show.season(SEASON_NUMBER)
     episodes = season.episodes()
@@ -39,13 +48,13 @@ for SEASON_STRING in seasons:
     # Adjust the regex if your naming differs.
     pattern = re.compile(r"S\d+E\d+ - (.+)\.[^.]+$")
 
-    # --- Process Each Episode ---
+    # --- So for each episode in a particular year ---
     for episode in episodes:
         try:
-            # Retrieve the file path from the episode media information
+            # Retrieve the file path from the current episode's media information
             file_path = episode.media[0].parts[0].file
+            # Isolate just the base file name
             file_name = os.path.basename(file_path)
-            # print(f"Title: {episode.title}, Season: {episode.seasonNumber}, Episode: {episode.episodeNumber}")
         except Exception as e:
             print(f"Could not retrieve file name for episode '{episode.title}': {e}")
             continue
@@ -58,19 +67,21 @@ for SEASON_STRING in seasons:
         if match:
             new_title = match.group(1).strip()
             print("New Title: " + new_title)
-            print("")
+            # If the new title is not the same as the current episode name
             if new_title != episode.title:
                 print(f"Updating episode title for '{episode.title}' to '{new_title}'")
                 try:
                     # Update the episode's title on Plex.
                     # Note: Your Plex server must allow metadata editing for this to work.
+                    # I am not sure WHY this magical syntax does the job, but it does.
                     episode.edit(**{"title.value":new_title})
                     episode.refresh
-                    print("Updated Title: " + episode.title)
-                    print("Update successful.")
+                    print("Update of title was successful.")
                 except Exception as e:
                     print(f"Error updating episode '{episode.title}': {e}")
             else:
                 print(f"Episode '{episode.title}' already has the expected title.")
         else:
             print(f"Filename '{file_name}' does not match the expected pattern. Skipping.")
+
+        print("")
