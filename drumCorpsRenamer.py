@@ -4,7 +4,7 @@ import re
 from plexapi.server import PlexServer
 
 # This program will attempt to rename episodes of a show using the metadata stored in the filename.
-# Files should be stroed in the following manner:
+# Files should be stored in the following manner:
 # Top Level Folder is the Library (of type TV Show within Plex) -- (Drum Corps)
 # Subfolder to process is the Show Name.  (DCI Finals)
 # Subfolders within the Show Name folder are the seasons.  (1974, 1975, etc.)
@@ -41,85 +41,90 @@ def scrub_title_semis(origStr):
 PLEX_URL = 'http://localhost:32400'           # Update if your Plex server is on a different host/port
 PLEX_TOKEN = 'aypiCtP6JnKHp3397Px4'             # Replace with your Plex token
 LIBRARY_NAME = 'Drum Corps'                    # Name of your Plex library
+
 FINALS_NAME = 'DCI Finals'
 SEMIS_NAME = 'DCI Semi Finals'
-SHOW_NAME = SEMIS_NAME
+event_array = [FINALS_NAME, SEMIS_NAME]
+
 FINALS_HOME = '/media/devmon/Samsung/Drum Corps/DCI Finals'
 SEMIS_HOME = '/media/devmon/Samsung/Drum Corps/DCI Semi Finals'
 LIBRARY_HOME = ''
 
-if (SHOW_NAME == FINALS_NAME):
-    LIBRARY_HOME = FINALS_HOME
-elif (SHOW_NAME == SEMIS_NAME):
-    LIBRARY_HOME = SEMIS_HOME
-else:
-    print("SHOW_NAME not properly defined.  Exitting...")
-    quit()
+for event in event_array:
 
-# --- Connect to Plex ---
-plex = PlexServer(PLEX_URL, PLEX_TOKEN)
-library = plex.library.section(LIBRARY_NAME)
-tv_show = plex.library.section(LIBRARY_NAME).get(SHOW_NAME)
+    SHOW_NAME = event
+    if (SHOW_NAME == FINALS_NAME):
+        LIBRARY_HOME = FINALS_HOME
+    elif (SHOW_NAME == SEMIS_NAME):
+        LIBRARY_HOME = SEMIS_HOME
+    else:
+        print("SHOW_NAME not properly defined.  Exitting...")
+        quit()
 
-seasons = get_directory_names(LIBRARY_HOME)
+    # --- Connect to Plex ---
+    plex = PlexServer(PLEX_URL, PLEX_TOKEN)
+    library = plex.library.section(LIBRARY_NAME)
+    tv_show = plex.library.section(LIBRARY_NAME).get(SHOW_NAME)
 
-for SEASON_STRING in seasons:
-    # In this case, I happen to know that each directory name is an integer (a Year number)
-    # so I am forcing the directory name to be interpreted as an integer here since Plex
-    # is expecting an integer for a season number.
-    SEASON_NUMBER = int(SEASON_STRING)
-    season = tv_show.season(SEASON_NUMBER)
-    episodes = season.episodes()
+    seasons = get_directory_names(LIBRARY_HOME)
 
-    # --- Define a Regex Pattern ---
-    # This example assumes filenames like: "S01E01 - Episode Title.mkv"
-    # Adjust the regex if your naming differs.
-    pattern = re.compile(r"S\d+E\d+ - (.+)\.[^.]+$")
+    for SEASON_STRING in seasons:
+        # In this case, I happen to know that each directory name is an integer (a Year number)
+        # so I am forcing the directory name to be interpreted as an integer here since Plex
+        # is expecting an integer for a season number.
+        SEASON_NUMBER = int(SEASON_STRING)
+        season = tv_show.season(SEASON_NUMBER)
+        episodes = season.episodes()
 
-    # --- So for each episode in a particular year ---
-    for episode in episodes:
-        try:
-            # Retrieve the file path from the current episode's media information
-            file_path = episode.media[0].parts[0].file
-            # Isolate just the base file name
-            file_name = os.path.basename(file_path)
-        except Exception as e:
-            print(f"Could not retrieve file name for episode '{episode.title}': {e}")
-            continue
+        # --- Define a Regex Pattern ---
+        # This example assumes filenames like: "S01E01 - Episode Title.mkv"
+        # Adjust the regex if your naming differs.
+        pattern = re.compile(r"S\d+E\d+ - (.+)\.[^.]+$")
 
-        print("Path: " + file_path)
-        print("File Name: " + file_name)
+        # --- So for each episode in a particular year ---
+        for episode in episodes:
+            try:
+                # Retrieve the file path from the current episode's media information
+                file_path = episode.media[0].parts[0].file
+                # Isolate just the base file name
+                file_name = os.path.basename(file_path)
+            except Exception as e:
+                print(f"Could not retrieve file name for episode '{episode.title}': {e}")
+                continue
 
-        if (SHOW_NAME == SEMIS_NAME):
-            file_name = re.sub(r'_', ' - ', file_name)
+            print("Path: " + file_path)
+            print("File Name: " + file_name)
 
-        # # Try to extract the episode title from the filename
-        match = pattern.match(file_name)
-        if match:
-            new_title = match.group(1).strip()
+            if (SHOW_NAME == SEMIS_NAME):
+                file_name = re.sub(r'_', ' - ', file_name)
 
-            if (SHOW_NAME == FINALS_NAME):
-                new_title = scrub_title_finals(new_title)
-            elif (SHOW_NAME == SEMIS_NAME):
-                new_title = scrub_title_semis(new_title)
+            # # Try to extract the episode title from the filename
+            match = pattern.match(file_name)
+            if match:
+                new_title = match.group(1).strip()
 
-            new_title = new_title.lstrip()
+                if (SHOW_NAME == FINALS_NAME):
+                    new_title = scrub_title_finals(new_title)
+                elif (SHOW_NAME == SEMIS_NAME):
+                    new_title = scrub_title_semis(new_title)
 
-            print("New Title: " + new_title)
-            # If the new title is not the same as the current episode name
-            if new_title != episode.title:
-                print(f"Updating episode title for '{episode.title}' to '{new_title}'")
-                try:
-                    # Update the episode's title on Plex.
-                    # Note: Your Plex server must allow metadata editing for this to work.
-                    # I am not sure WHY this magical syntax does the job, but it does.
-                    episode.edit(**{"title.value":new_title})
-                    print("Update of title was successful.")
-                except Exception as e:
-                    print(f"Error updating episode '{episode.title}': {e}")
+                new_title = new_title.lstrip()
+
+                print("New Title: " + new_title)
+                # If the new title is not the same as the current episode name
+                if new_title != episode.title:
+                    print(f"Updating episode title for '{episode.title}' to '{new_title}'")
+                    try:
+                        # Update the episode's title on Plex.
+                        # Note: Your Plex server must allow metadata editing for this to work.
+                        # I am not sure WHY this magical syntax does the job, but it does.
+                        episode.edit(**{"title.value":new_title})
+                        print("Update of title was successful.")
+                    except Exception as e:
+                        print(f"Error updating episode '{episode.title}': {e}")
+                else:
+                    print(f"Episode '{episode.title}' already has the expected title.")
             else:
-                print(f"Episode '{episode.title}' already has the expected title.")
-        else:
-            print(f"Filename '{file_name}' does not match the expected pattern. Skipping.")
+                print(f"Filename '{file_name}' does not match the expected pattern. Skipping.")
 
-        print("")
+            print("")
